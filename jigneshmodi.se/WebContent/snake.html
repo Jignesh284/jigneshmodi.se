@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>SNAKE</title>
+	<style>
+	canvas {
+		border: 1px solid green;
+		position: absolute;
+		display: block ;
+		margin: auto; 
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+	}	
+	</style>
+	
+</head>
+<body>
+<script type="text/javascript">
+	//Constants
+	var COLS=30, ROWS=30;
+	//Ids
+	var EMPTY=0, SNAKE=1, FRUIT=2, OBSTACLE = 3;
+	//Directions
+	var LEFT=0, UP=1, RIGHT= 2, DOWN=3; 
+	//keycodes
+	var  KEY_LEFT=37, KEY_UP=38, KEY_RIGHT=39, KEY_DOWN=40, KEY_ENTER=13; 
+	// Game States
+	var ON=1, OFF=0;
+
+
+	var grid ={
+
+		width: null,
+		height: null,
+		_grid: null,
+
+		init: function( d, c, r ) {
+			this.width = c;
+			this.height = r;
+			this._grid = [];
+
+			for (var x=0; x < c; x++ ){
+				this._grid.push([]);
+				for ( var y=0; y<r ; y++ ) {
+					this._grid[x].push(d); 
+				}
+			}
+
+		},
+
+		set: function( val, x, y ) { 
+			this._grid[x][y] = val;
+		},
+
+		get: function( x, y) {
+			return this._grid[x][y]; 
+		}
+
+	}
+
+	var snake = {
+		direction: null,
+		last: null,
+		_queue: null,
+
+		init: function( d, x, y ) {
+			this.direction = d;
+			this._queue = [];
+			this.insert( x, y );
+
+		},
+
+		insert: function( x, y ) {
+			//understand?
+			this._queue.unshift({ x:x, y:y});
+			this.last = this._queue[0];
+		},
+
+		remove: function () {
+			return this._queue.pop();  		
+		}
+	}
+
+	function setFood() {
+		var empty = [];
+		for ( var x=0 ; x< grid.width ; x++ ) {
+			for ( var y=0 ; y< grid.height ; y++ ) {
+				if( grid.get(x,y) === EMPTY) {
+					empty.push( { x:x, y:y } );	
+				}
+			}
+		}
+		var randpos = empty[ Math.floor(Math.random()* empty.length ) ]
+		grid.set( FRUIT, randpos.x, randpos.y ); 
+	}
+
+	//game objects
+	var canvas, ctx, keystate, frames, gameState, speed, highScore, flag; 
+
+	function main() {
+		canvas = document.createElement( "canvas" );
+		canvas.width = COLS*20;
+		canvas.height = ROWS*20;
+		ctx = canvas.getContext("2d");
+		document.body.appendChild(canvas); 
+		frames = 0;
+		keystate = {};
+		
+		document.addEventListener("keydown", function(evt){
+			keystate = {};
+			keystate[evt.keyCode] = true;
+		});
+		// document.addEventListener("keyup", function(evt){
+		// 	delete keystate[evt.keyCode];
+		// });
+		
+		init();
+		loop();
+
+	}
+
+	function init() {
+		score= 0;
+		speed = 15;
+		flag = ON; 
+		gameState= ON;
+		highScore =  localStorage['score'] !== undefined ? localStorage['score'] : 0 ; 
+		grid.init( EMPTY, ROWS, COLS ); 
+
+		var sp = { x:Math.floor( COLS/2), y:ROWS-1 }
+		snake.init( UP, sp.x, sp.y ); 
+		grid.set( SNAKE, sp.x, sp.y );
+		// grid.set( OBSTACLE, 15,15 );
+		// grid.set( OBSTACLE, 15,16 );grid.set( OBSTACLE, 15,17 );grid.set( OBSTACLE, 15,18 );
+
+		setFood();	
+	}
+
+	function loop() {
+		update();
+		if( flag ) draw();
+		window.requestAnimationFrame(loop, canvas); 
+	}
+
+	function update() {
+		frames++;
+		if( frames%speed  === 0 ){
+			//Calculating next location for snake(nx,ny)
+			var nx = snake.last.x;
+			var ny = snake.last.y;
+
+			if(keystate[KEY_LEFT] && snake.direction !== RIGHT) snake.direction = LEFT;
+			if(keystate[KEY_UP] && snake.direction !== DOWN) snake.direction = UP;
+			if(keystate[KEY_RIGHT] && snake.direction !== LEFT) snake.direction = RIGHT;
+			if(keystate[KEY_DOWN] && snake.direction !== UP) snake.direction = DOWN;
+
+
+			switch( snake.direction ) {
+				case LEFT:
+				nx--;
+				break;
+				case RIGHT:
+				nx++;
+				break;
+				case UP:
+				ny--;
+				break;
+				case DOWN:
+				ny++;
+				break;
+			}
+			if( hasExitCondition( nx, ny )  ) {
+			//checking game is ON or OFF
+				grid.init(EMPTY, 30,30 );
+				gameState = OFF;
+
+				highScore = (score > highScore)?  score : highScore;
+				localStorage['score'] = highScore;
+
+				if(keystate[KEY_ENTER])  init();
+			} else if ( grid.get( nx,ny) === FRUIT ){
+				//Snake eating fruit
+				var tail = { x:nx, y:ny };
+				score++;
+				if( speed > 5) speed-- ;
+				setFood();
+				grid.set(SNAKE, tail.x, tail.y );
+			    snake.insert( tail.x, tail.y );
+			} else {
+				var tail = snake.remove();
+				grid.set( EMPTY, tail.x , tail.y );
+				tail.x = nx;
+				tail.y = ny;
+				grid.set(SNAKE, tail.x, tail.y );
+				snake.insert( tail.x, tail.y );
+			}	
+		}
+	}
+	function hasExitCondition( nx, ny ) {
+		if (0 > nx || nx > grid.width-1 ||
+				0 > ny || ny > grid.height-1 || gameState === OFF || biteItself( nx, ny ) || checkObstacle(nx,ny)  ) return true;
+			else return false;
+	}
+	function biteItself( nx, ny) {
+		if( grid.get( nx, ny ) === SNAKE ) return true;
+		else return false;	
+	}
+	function checkObstacle( nx,ny ) {
+		if( grid.get( nx, ny ) === OBSTACLE ) return true;
+		else return false;	
+	}
+	function draw() {
+		var tw = canvas.width/grid.width;
+		var th = canvas.height/grid.height;
+		for ( var x=0 ; x< grid.width ; x++ ) {
+			for ( var y=0 ; y< grid.height ; y++ ) {
+				switch( grid.get( x, y ) ){
+					case EMPTY:
+					ctx.fillStyle = "#565656";
+					break;
+					case SNAKE:
+					ctx.fillStyle = "#f33";
+					break;
+					case FRUIT:
+					ctx.fillStyle = "lightblue"; 
+					break;
+					case OBSTACLE:
+					ctx.fillStyle = "GREEN"; 
+					break;
+				}
+				ctx.fillRect( x*tw, y*th, tw, th);
+			}
+		}
+			
+			ctx.font="13px Arial";
+			ctx.fillStyle='#f80';
+			ctx.fillText('HIGH SCORE: '+ highScore , canvas.width-120, canvas.height-10);
+		switch(gameState) {
+			case ON:
+			
+		  	ctx.fillText('SCORE: '+ score , 10, canvas.height-10);	
+			break;
+			case OFF:
+		
+			ctx.font= "30px Arial";
+			ctx.fillStyle='#f80';
+			ctx.fillText("GAME OVER!" ,200 , 250);
+			ctx.fillStyle='#fff'
+			ctx.fillText("PRESS ENTER" ,190 , 320);
+			
+			
+			flag = OFF;
+			
+			break;
+			
+		}
+		
+	}
+
+	main();
+</script>
+
+</body>
+</html>
